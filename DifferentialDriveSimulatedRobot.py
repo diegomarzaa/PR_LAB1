@@ -108,10 +108,29 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
         """
 
         # TODO: to be completed by the student
-        #
+        eta_prev = Pose3D(xsk_1[0:3])
+        nu_prev = xsk_1[3:6]
+        
+        nu_desired = np.array([
+            [usk[0, 0]],  # avance
+            [0.0],       # velocidad lateral -> en diferencial no hay
+            [usk[1, 0]]  # giro
+        ])
 
+        # NEW MOVEMENT
+        # -- Acceleration noise
+        w = np.random.multivariate_normal(
+            np.zeros(3),
+            self.Qsk
+        ).reshape(3, 1)
 
-        #
+        eta_new = eta_prev.oplus(Pose3D(nu_prev * self.dt + 0.5 * w * self.dt**2))
+        
+        # NEW VELOCITY
+        K = np.diag([1.0, 1.0, 1.0]) # TODO: que valor??
+        nu_new = nu_prev + K @ (nu_desired - nu_prev) + w * self.dt
+        
+        self.xsk = np.vstack((eta_new, nu_new))  # TODO: revisar. hace falta poner self.xsk_1 y self.usk?
 
         if self.k % self.visualizationInterval == 0:
                 self.PlotRobot()

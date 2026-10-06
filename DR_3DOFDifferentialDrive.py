@@ -1,5 +1,6 @@
 from Localization import *
 import numpy as np
+from Pose3D import Pose3D
 
 class DR_3DOFDifferentialDrive(Localization):
     """
@@ -32,19 +33,33 @@ class DR_3DOFDifferentialDrive(Localization):
         # Store previous state and input for Logging purposes
         self.etak_1 = xk_1  # store previous state
         self.uk = uk  # store input
+        nu_k = uk
 
-        # TODO: to be completed by the student
-
-        pass
+        etak = Pose3D(xk_1).oplus(nu_k*self.dt)
+        return etak
 
     def GetInput(self):
         """
         Get the input for the motion model. In this case, the input is the readings from both wheel encoders.
 
-        :return: uk:  input vector (:math:`u_k=[n_L~n_R]^T`)
+        :return: uk: input vector (:math:`u_k=[u_{k}~v_{k}~w_{k}~r_{k}]^T`)
         """
+        self.wheelBase
+        zsk, _ = self.robot.ReadEncoders()
+        n_L, n_R = zsk[0,0], zsk[1,0]
+        
+        # 1. Obtain distance each wheel
+        dist_per_pulse = (2 * np.pi * self.wheelRadius) / self.robot.pulse_x_wheelTurns
+        d_L = n_L * dist_per_pulse
+        d_R = n_R * dist_per_pulse
+        
+        # 2. Obtain distance robot
+        d = (d_L + d_R) / 2
+        theta = (d_R - d_L) / self.wheelBase
 
-        # TODO: to be completed by the student
-
-        pass
-
+        # 3. Obtain speed
+        u = d / self.dt
+        v = 0.0
+        r = theta / self.dt
+        
+        return np.array([[u],[v],[r]])

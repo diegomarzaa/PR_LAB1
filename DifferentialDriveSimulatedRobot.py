@@ -130,7 +130,9 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
         K = np.diag([1.0, 1.0, 1.0]) # TODO: que valor??
         nu_new = nu_prev + K @ (nu_desired - nu_prev) + w * self.dt
         
-        self.xsk = np.vstack((eta_new, nu_new))  # TODO: revisar. hace falta poner self.xsk_1 y self.usk?
+        self.xsk = np.vstack((eta_new, nu_new))  # TODO: revisar. hace falta poner self.usk?
+        self.xsk_1 = xsk_1   # Guardandolo, así desde ReadEncoders() se puede hacer la diferencia de posiciones 
+        # TODO: Duda, hay que usar xsk_1.copy()????
 
         if self.k % self.visualizationInterval == 0:
                 self.PlotRobot()
@@ -150,20 +152,53 @@ class DifferentialDriveSimulatedRobot(SimulatedRobot):
 
         :return zsk,Rsk: :math:`zk=[n_L~n_R]^T` observation vector containing number of pulses read from the left and right wheel encoders. :math:`R_{s_k}=diag(\\sigma_L^2,\\sigma_R^2)` covariance matrix of the read pulses.
         """
+        # Movimiento del último paso, expresado en los ejes anteriores del robot
+        eta_prev = Pose3D(self.xsk_1[0:3])
+        eta_now = Pose3D(self.xsk[0:3])
+        delta_eta = eta_prev.ominus().oplus(eta_now)
 
-        # TODO: to be completed by the student
+        d = delta_eta[0, 0]       # avance local aproximado
+        dtheta = delta_eta[2, 0]  # giro durante el paso
 
-        pass
+        # Recorrido de cada rueda: ecuaciones de odometría despejadas
+        wheel_base = self.wheelBase
+        n_L = d - wheel_base / 2 * dtheta
+        n_R = d + wheel_base / 2 * dtheta
+
+        # Recorrido -> pulsos
+        pulses_per_meter = self.pulse_x_wheelTurns / (2 * np.pi * self.wheelRadius)
+
+        z_ideal = pulses_per_meter * np.array([
+            [n_L],
+            [n_R]
+        ])
+
+        # Ruido de medida de los encoders
+        noise = np.random.multivariate_normal(
+            np.zeros(2), self.Re
+        ).reshape(2, 1)
+
+        zsk = z_ideal + noise
+
+        return zsk, self.Re
 
     def ReadCompass(self):
         """ Simulates the compass reading of the robot.
 
         :return: yaw and the covariance of its noise *R_yaw*
         """
+        
+        yaw_true = self.xsk[2, 0]
 
-        # TODO: to be completed by the student
+        noise = np.random.normal(
+            loc=0.0,
+            scale=self.v_yaw_std
+        )
 
-        pass
+        yaw_measured = yaw_true + noise
+        R_yaw = self.v_yaw_std**2
+
+        return yaw_measured, R_yaw
 
     def PlotRobot(self):
         """ Updates the plot of the robot at the current pose """
